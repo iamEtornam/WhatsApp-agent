@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+build/
+out/
+*.class
+*.jar
+
+# IntelliJ / Fleet
+.idea/
+*.iml
+.fleet/
+
+# Environment variables
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

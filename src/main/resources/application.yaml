@@ -1,0 +1,17 @@
+ktor:
+  application:
+    modules:
+      - com.whatsapp.bot.MainKt.module
+  deployment:
+    port: 8080
+    host: 0.0.0.0
+
+koog:
+  google:
+    apikey: ${GOOGLE_API_KEY}
+
+kapso:
+  apiKey: ${KAPSO_API_KEY}
+  phoneNumberId: ${KAPSO_PHONE_NUMBER_ID}
+  webhookSecret: ${KAPSO_WEBHOOK_SECRET}
+  baseUrl: https://api.kapso.ai
