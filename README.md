@@ -1,71 +1,77 @@
-# WhatsApp AI Bot
+<div align="center">
+  <img src="assets/banner.png" alt="WhatsApp AI Bot Banner" width="800">
 
-A production-ready WhatsApp bot powered by **Google Gemini 2.0 Flash** and the **Koog AI agent framework**. Built with Kotlin and Ktor, it handles real conversations, sends rich media, reacts to messages, and presents interactive button menus — all through the Kapso WhatsApp Cloud API.
+  # WhatsApp AI Bot
+  
+  [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.0-blue.svg?logo=kotlin)](https://kotlinlang.org/)
+  [![Ktor](https://img.shields.io/badge/Ktor-3.1.2-purple.svg?logo=ktor)](https://ktor.io/)
+  [![Gemini](https://img.shields.io/badge/Gemini-3_Flash_Preview-orange.svg?logo=google-gemini)](https://aistudio.google.com/)
+  [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+  **A production-ready WhatsApp bot powered by Google Gemini 3 Flash Preview and the Koog AI agent framework.**
+  
+  Built with Kotlin and Ktor, it handles real conversations, sends rich media, reacts to messages, and presents interactive button menus — all through the Kapso WhatsApp Cloud API.
+</div>
 
 ---
 
-## What It Does
+## 🚀 Features
+
+- **🧠 Intelligent Reasoning** — Powered by Gemini 3 Flash Preview for context-aware responses and tool execution.
+- **📱 Rich Media Support** — Understands and sends text, images, videos, audio clips, documents, locations, reactions, and stickers.
+- **💾 Per-User Memory** — Maintains conversation history independently for each user (up to 20 messages).
+- **🛡️ Secure Webhooks** — HMAC-SHA256 signature verification and automatic message deduplication.
+- **⚡ High Performance** — Built on Ktor and Coroutines with optimized thread management.
+- **🌍 Multilingual** — Automatically responds in the same language the user writes in.
+
+---
+
+## 🛠️ What It Does
 
 When a WhatsApp user sends a message to your number, the bot:
 
-1. Receives it via a secure webhook (HMAC-SHA256 verified)
-2. Passes it to a per-user AI agent with full conversation memory
-3. The agent reasons with Gemini 2.0 Flash and picks the right response action
-4. Sends back a text reply, image, document, emoji reaction, or interactive button menu
-
-The bot understands text, images, videos, audio clips, documents, locations, reactions, stickers, and contact cards — and always responds in the **same language the user writes in**.
+1.  **Receives** it via a secure webhook (HMAC-SHA256 verified).
+2.  **Analyzes** it with a per-user AI agent that has full conversation memory.
+3.  **Reasons** with Gemini 3 Flash Preview and selects the appropriate response action.
+4.  **Responds** with a text reply, image, document, emoji reaction, or interactive button menu.
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-```
-WhatsApp User
-     │
-     ▼
- Kapso API  ──webhook──▶  POST /webhook
-                               │
-                         WebhookHandler
-                         (sig verify + dedup)
-                               │
-                           BotAgent
-                         (per-user memory)
-                               │
-                      Gemini 2.0 Flash (Koog)
-                               │
-                         WhatsAppTools
-                    ┌──────────┴──────────┐
-               sendText            sendButtons
-               sendImage           sendReaction
-               sendDocument
-                               │
-                           KapsoClient
-                               │
-                           Kapso API  ──▶  WhatsApp User
+```mermaid
+graph TD
+    User([WhatsApp User]) <--> Kapso[Kapso API]
+    Kapso -- webhook --> WH[WebhookHandler<br/>(HMAC Verify + Dedup)]
+    WH --> BA[BotAgent<br/>(Per-user Memory)]
+    BA <--> G2F[Gemini 3 Flash Preview<br/>(Koog AI)]
+    G2F --> WT[WhatsAppTools]
+    WT -- sendText/sendButtons/sendImage... --> KC[KapsoClient]
+    KC -- REST API --> Kapso
 ```
 
-**Key design decisions:**
+### Key Design Decisions
 
-- **One agent per message** — no shared mutable state across concurrent users
-- **Shared HTTP executor** — connection pool and TLS handshakes reused across invocations
-- **Per-user chat memory** — conversation history keyed on phone number (window: 20 messages)
-- **Webhook deduplication** — in-memory idempotency cache with 5-minute TTL
-- **Isolated tool thread pool** — 2× CPU cores, separate from the shared IO dispatcher
+-   **One agent per message** — No shared mutable state across concurrent users.
+-   **Shared HTTP executor** — Connection pool and TLS handshakes reused across invocations.
+-   **Per-user chat memory** — Conversation history keyed on phone number (window: 20 messages).
+-   **Webhook deduplication** — In-memory idempotency cache with 5-minute TTL.
+-   **Isolated tool thread pool** — 2× CPU cores, separate from the shared IO dispatcher.
 
 ---
 
-## Prerequisites
+## 📋 Prerequisites
 
 | Requirement | Version |
-|-------------|---------|
-| JDK | 17 or later |
-| Gradle | Included via `./gradlew` wrapper |
-| Kapso account | [app.kapso.ai](https://app.kapso.ai) |
-| Google AI API key | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| :--- | :--- |
+| **JDK** | 17 or later |
+| **Gradle** | Included via `./gradlew` wrapper |
+| **Kapso account** | [app.kapso.ai](https://app.kapso.ai) |
+| **Google AI API key** | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
 ### 1. Clone the repository
 
@@ -85,7 +91,7 @@ cp .env.example .env
 Open `.env` and set each value:
 
 ```dotenv
-# Google AI API key — powers the Gemini 2.0 Flash model
+# Google AI API key — powers the Gemini 3 Flash Preview model
 # Get yours at https://aistudio.google.com/app/apikey
 GOOGLE_API_KEY=AIza...
 
@@ -105,7 +111,7 @@ KAPSO_WEBHOOK_SECRET=your_webhook_secret_here
 PORT=8080
 ```
 
-> **Getting your Kapso credentials**
+> **Note on Kapso credentials:**
 > 1. Sign up at [app.kapso.ai](https://app.kapso.ai)
 > 2. Connect a WhatsApp phone number in the dashboard
 > 3. Navigate to **Settings → API Keys** to get `KAPSO_API_KEY`
@@ -114,51 +120,29 @@ PORT=8080
 
 ---
 
-### 3. Build the project
+### 3. Build and Run
 
+#### Development
+
+**Option A — Gradle run**
 ```bash
-./gradlew build
-```
-
-This compiles the Kotlin source, runs tests, and produces a fat JAR.
-
----
-
-### 4. Run the server
-
-**Option A — Gradle run (development)**
-
-Export your variables and run:
-
-```bash
-export GOOGLE_API_KEY=AIza...
-export KAPSO_API_KEY=kap_...
-export KAPSO_PHONE_NUMBER_ID=647015955153740
-export KAPSO_WEBHOOK_SECRET=your_webhook_secret_here
-
 ./gradlew run
 ```
 
-**Option B — Fat JAR (production)**
-
+**Option B — With hot-reload**
 ```bash
+./gradlew -t build & ./gradlew run
+```
+
+#### Production
+
+**Option C — Fat JAR**
+```bash
+./gradlew build
 java -jar build/libs/whatsapp-bot-1.0.0.jar
 ```
 
-**Option C — With a `.env` file (using `dotenv`)**
-
-```bash
-# macOS/Linux with dotenv-cli installed
-dotenv ./gradlew run
-```
-
-The server starts on `http://0.0.0.0:8080` by default. You should see:
-
-```
-INFO  Application - Responding at http://0.0.0.0:8080
-```
-
-Verify it's running:
+The server starts on `http://0.0.0.0:8080` by default. Verify it's running:
 
 ```bash
 curl http://localhost:8080/
@@ -167,39 +151,28 @@ curl http://localhost:8080/
 
 ---
 
-### 5. Expose your webhook
+### 4. Expose and Register Webhook
 
-Kapso needs to reach your server over the internet. During development, use a tunneling tool:
+Kapso needs to reach your server over the internet. Use a tunneling tool:
 
 ```bash
 # Using ngrok
 ngrok http 8080
-
-# Using cloudflared
-cloudflare tunnel --url http://localhost:8080
 ```
 
-Copy the public HTTPS URL (e.g. `https://abc123.ngrok.io`).
+1.  Open [app.kapso.ai](https://app.kapso.ai) → **Webhooks**
+2.  Set the webhook URL to: `https://<your-public-url>/webhook`
+3.  Paste your `KAPSO_WEBHOOK_SECRET` into the **Secret** field
+4.  Save and verify — Kapso will send a test ping to confirm reachability.
 
 ---
 
-### 6. Register the webhook in Kapso
+## 📂 Project Structure
 
-1. Open [app.kapso.ai](https://app.kapso.ai) → **Webhooks**
-2. Set the webhook URL to: `https://<your-public-url>/webhook`
-3. Paste your `KAPSO_WEBHOOK_SECRET` into the **Secret** field
-4. Save and verify — Kapso will send a test ping to confirm reachability
-
----
-
-## Project Structure
-
-```
+```text
 whatsapp-messenger/
 ├── .env.example                             # Environment variable template
-├── .gitignore
 ├── build.gradle.kts                         # Gradle build (Kotlin DSL)
-├── settings.gradle.kts
 └── src/main/
     ├── kotlin/com/whatsapp/bot/
     │   ├── Main.kt                          # Entry point, Ktor server setup, routes
@@ -220,30 +193,24 @@ whatsapp-messenger/
 
 ---
 
-## Available Bot Capabilities
+## 🤖 Bot Capabilities
 
-The AI agent can invoke these actions autonomously based on context:
+The AI agent can invoke these actions autonomously:
 
 | Action | Description |
-|--------|-------------|
+| :--- | :--- |
 | `sendTextReply` | Send a plain text message |
 | `sendImage` | Send an image from a public URL with an optional caption |
 | `sendDocument` | Send a file from a public URL with a display filename |
 | `sendReaction` | React to the user's message with any emoji |
 | `sendButtons` | Send a message with up to 3 quick-reply buttons |
 
-**Inbound message types understood:**
-
-Text · Images · Videos · Audio clips · Documents · Locations · Emoji reactions · Stickers · Contact cards
-
 ---
 
-## Configuration Reference
-
-All configuration lives in `src/main/resources/application.yaml` and is overridden by environment variables at runtime.
+## ⚙️ Configuration Reference
 
 | Environment Variable | Required | Default | Description |
-|---------------------|----------|---------|-------------|
+| :--- | :--- | :--- | :--- |
 | `GOOGLE_API_KEY` | Yes | — | Google AI API key for Gemini |
 | `KAPSO_API_KEY` | Yes | — | Kapso API bearer token |
 | `KAPSO_PHONE_NUMBER_ID` | Yes | — | Your Kapso phone number ID |
@@ -252,70 +219,18 @@ All configuration lives in `src/main/resources/application.yaml` and is overridd
 
 ---
 
-## Logging
+## 📝 License
 
-The bot uses [Logback](https://logback.qos.ch/) with the following log levels:
-
-| Logger | Level |
-|--------|-------|
-| `com.whatsapp.bot` | `DEBUG` |
-| Ktor, Koog | `INFO` |
-| Root | `INFO` |
-
-To change log levels, edit [`src/main/resources/logback.xml`](src/main/resources/logback.xml).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Tech Stack
+## 🤝 Contributing
 
-| Layer | Technology |
-|-------|-----------|
-| Language | Kotlin 2.2.0 |
-| HTTP Server | [Ktor](https://ktor.io/) 3.1.2 (Netty engine) |
-| HTTP Client | Ktor CIO client |
-| AI Framework | [Koog](https://github.com/JetBrains/koog) 0.7.1 |
-| LLM | Google Gemini 2.0 Flash |
-| Serialization | kotlinx.serialization 1.8.1 |
-| Concurrency | Kotlin Coroutines 1.10.2 |
-| Logging | Logback 1.5.18 |
-| Build | Gradle 8+ (Kotlin DSL) |
-| JVM | Java 17 |
+Contributions are welcome! Please feel free to submit a Pull Request.
 
----
-
-## Webhook Security
-
-Incoming webhook requests are verified using **HMAC-SHA256** signatures. Kapso signs each request with your `KAPSO_WEBHOOK_SECRET` and includes the signature in the `X-Kapso-Signature` header.
-
-If `KAPSO_WEBHOOK_SECRET` is set, the handler rejects any request with an invalid or missing signature with `403 Forbidden`. If it is not set, verification is skipped (not recommended for production).
-
-**Deduplication:** Each event carries a unique idempotency key. The webhook handler maintains an in-memory cache of recently processed keys (5-minute TTL) and silently discards duplicates.
-
----
-
-## Development Tips
-
-**Run with hot-reload (continuous build):**
-
-```bash
-./gradlew -t build &
-./gradlew run
-```
-
-**View all available Gradle tasks:**
-
-```bash
-./gradlew tasks
-```
-
-**Run tests:**
-
-```bash
-./gradlew test
-```
-
-**Inspect the fat JAR contents:**
-
-```bash
-jar tf build/libs/whatsapp-bot-1.0.0.jar | grep "Main"
-```
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
