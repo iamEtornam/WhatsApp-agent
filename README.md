@@ -153,7 +153,43 @@ curl http://localhost:8080/
 
 ---
 
-### 4. Expose and Register Webhook
+### 4. Docker Deployment (recommended for production)
+
+No local JDK required — Docker handles the build and runtime.
+
+**Prerequisites:** Docker ≥ 24 with Compose V2.
+
+```bash
+# 1. Load secrets into your current bash/zsh session
+# This avoids macOS file-sharing permission errors with .env files
+export $(grep -v '^#' .env | xargs)
+
+# 2. Build the image and start the container
+docker compose up --build -d
+
+# 3. Check it's healthy
+curl http://localhost:8080/
+# → {"status":"ok"}
+
+# 4. Tail logs
+docker compose logs -f whatsapp-bot
+
+# 4. Stop
+docker compose down
+```
+
+The image uses a multi-stage build:
+
+| Stage | Base image | Purpose |
+| :--- | :--- | :--- |
+| `builder` | `gradle:8.10-jdk17` | Compiles the project into a fat JAR |
+| `runtime` | `eclipse-temurin:17-jre-jammy` | Runs the JAR (~250 MB final image, multi-arch) |
+
+> **Secrets** — only the `.env` file is mounted at runtime via `env_file`. It is listed in `.dockerignore` so it is **never** baked into the image.
+
+---
+
+### 5. Expose and Register Webhook
 
 Kapso needs to reach your server over the internet. Use a tunneling tool:
 

@@ -7,7 +7,6 @@ WORKDIR /app
 # Copy dependency descriptors first so Gradle's layer cache is reused when only
 # source files change (not the build scripts).
 COPY build.gradle.kts settings.gradle.kts ./
-COPY gradle/ gradle/
 
 # Pre-fetch all dependencies (cache layer)
 RUN gradle dependencies --no-daemon --quiet || true
@@ -18,10 +17,10 @@ RUN gradle shadowJar --no-daemon --quiet
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────
 # Eclipse Temurin 17 JRE slim is ~180 MB vs the full JDK (~600 MB).
-FROM eclipse-temurin:17-jre-alpine AS runtime
+FROM eclipse-temurin:17-jre-jammy AS runtime
 
 # Non-root user for security hardening
-RUN addgroup -S botgroup && adduser -S botuser -G botgroup
+RUN groupadd -r botgroup && useradd -r -g botgroup botuser
 USER botuser
 
 WORKDIR /app

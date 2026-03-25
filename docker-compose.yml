@@ -7,9 +7,14 @@ services:
     image: whatsapp-bot:latest
     container_name: whatsapp-bot
 
-    # All secrets are read from the .env file at runtime – never baked into the image.
-    env_file:
-      - .env
+    # Load secrets from your shell environment.
+    # Before running: export $(grep -v '^#' .env | xargs)
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - KAPSO_API_KEY=${KAPSO_API_KEY:-}
+      - KAPSO_PHONE_NUMBER_ID=${KAPSO_PHONE_NUMBER_ID:-}
+      - KAPSO_WEBHOOK_SECRET=${KAPSO_WEBHOOK_SECRET:-}
+      - PORT=${PORT:-8080}
 
     ports:
       - "${PORT:-8080}:8080"
