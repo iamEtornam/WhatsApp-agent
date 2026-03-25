@@ -41,12 +41,14 @@ When a WhatsApp user sends a message to your number, the bot:
 
 ```mermaid
 graph TD
-    User([WhatsApp User]) <--> Kapso[Kapso API]
-    Kapso -- webhook --> WH[WebhookHandler<br/>(HMAC Verify + Dedup)]
-    WH --> BA[BotAgent<br/>(Per-user Memory)]
-    BA <--> G2F[Gemini 3 Flash Preview<br/>(Koog AI)]
+    User([WhatsApp User]) --> Kapso[Kapso API]
+    Kapso --> User
+    Kapso -- webhook --> WH["WebhookHandler\nHMAC Verify + Dedup"]
+    WH --> BA["BotAgent\nPer-user Memory"]
+    BA --> G2F["Gemini 3 Flash Preview\nKoog AI"]
+    G2F --> BA
     G2F --> WT[WhatsAppTools]
-    WT -- sendText/sendButtons/sendImage... --> KC[KapsoClient]
+    WT -- sendText, sendImage, sendButtons --> KC[KapsoClient]
     KC -- REST API --> Kapso
 ```
 
