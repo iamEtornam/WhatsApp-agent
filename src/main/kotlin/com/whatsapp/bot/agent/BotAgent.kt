@@ -1,8 +1,9 @@
 package com.whatsapp.bot.agent
 
+import ai.koog.agents.chatMemory.feature.ChatMemory
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
-import ai.koog.agents.features.memory.feature.ChatMemory
+import ai.koog.agents.core.tools.reflect.tools
 import ai.koog.prompt.executor.clients.google.GoogleModels
 import ai.koog.prompt.executor.llms.all.simpleGoogleAIExecutor
 import com.whatsapp.bot.kapso.InboundMessage
@@ -72,14 +73,14 @@ class BotAgent(
         }
     }
 
-    private fun buildAgent(tools: WhatsAppTools): AIAgent =
+    private fun buildAgent(toolSet: WhatsAppTools): AIAgent<String, String> =
             AIAgent(
                     promptExecutor = executor,
                     systemPrompt = SYSTEM_PROMPT,
                     llmModel = GoogleModels.Gemini3_Flash_Preview,
                     temperature = 0.7,
                     maxIterations = 10,
-                    toolRegistry = ToolRegistry { tools(tools) },
+                    toolRegistry = ToolRegistry { tools(toolSet) },
             ) { install(ChatMemory) { windowSize(20) } }
 
     private fun buildUserInput(message: InboundMessage): String = buildString {
