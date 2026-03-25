@@ -1,0 +1,36 @@
+services:
+  whatsapp-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: whatsapp-bot:latest
+    container_name: whatsapp-bot
+
+    # All secrets are read from the .env file at runtime – never baked into the image.
+    env_file:
+      - .env
+
+    ports:
+      - "${PORT:-8080}:8080"
+
+    # Restart automatically unless explicitly stopped
+    restart: unless-stopped
+
+    # Health-check: hit the root endpoint that returns {"status":"ok"}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Resource limits suitable for a small cloud VM (512 MB RAM, 0.5 CPU)
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M

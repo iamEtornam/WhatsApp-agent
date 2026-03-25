@@ -1,0 +1,26 @@
+# Gradle build output – rebuilt inside the Docker builder stage
+.gradle/
+build/
+
+# Secrets – must NEVER be baked into an image
+.env
+
+# Version control metadata
+.git/
+.gitignore
+
+# Editor / IDE noise
+.idea/
+*.iml
+*.iws
+.DS_Store
+
+# Docker files themselves (avoid recursive copy)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs & assets (not needed at runtime)
+README.md
+assets/
+LICENSE
