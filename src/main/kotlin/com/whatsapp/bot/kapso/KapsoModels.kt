@@ -152,11 +152,32 @@ data class InboundMessage(
         val location: InboundLocation? = null,
         val reaction: InboundReaction? = null,
         val contacts: List<JsonElement>? = null,
-        val interactive: JsonElement? = null,
+        val interactive: InboundInteractive? = null,
         val kapso: MessageKapso? = null,
         val context: MessageContext? = null,
         val from: String? = null,
         val to: String? = null,
+)
+
+@Serializable
+data class InboundInteractive(
+        val type: String? = null,
+        @SerialName("button_reply") val buttonReply: InboundButtonReply? = null,
+        @SerialName("list_reply") val listReply: InboundListReply? = null,
+        @SerialName("nfm_reply") val nfmReply: JsonElement? = null,
+)
+
+@Serializable
+data class InboundButtonReply(
+        val id: String? = null,
+        val title: String? = null,
+)
+
+@Serializable
+data class InboundListReply(
+        val id: String? = null,
+        val title: String? = null,
+        val description: String? = null,
 )
 
 @Serializable data class InboundText(val body: String? = null)

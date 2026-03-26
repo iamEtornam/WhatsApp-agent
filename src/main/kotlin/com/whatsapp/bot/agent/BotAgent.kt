@@ -1,13 +1,17 @@
 package com.whatsapp.bot.agent
 
 import ai.koog.agents.chatMemory.feature.ChatMemory
+import ai.koog.agents.chatMemory.feature.InMemoryChatHistoryProvider
 import ai.koog.agents.core.agent.AIAgent
 import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.agents.core.tools.reflect.tools
 import ai.koog.prompt.executor.clients.google.GoogleModels
 import ai.koog.prompt.executor.llms.all.simpleGoogleAIExecutor
+import com.whatsapp.bot.kapso.InboundInteractive
 import com.whatsapp.bot.kapso.InboundMessage
 import com.whatsapp.bot.kapso.KapsoClient
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import org.slf4j.LoggerFactory
 
 private val SYSTEM_PROMPT =
@@ -39,6 +43,7 @@ class BotAgent(
         private val kapsoClient: KapsoClient,
 ) {
     private val logger = LoggerFactory.getLogger(BotAgent::class.java)
+    private val sharedChatHistoryProvider = InMemoryChatHistoryProvider()
 
     // Created once; the underlying Ktor HttpClient and thread pool are reused
     // across all agent invocations.
@@ -61,7 +66,16 @@ class BotAgent(
         logger.info("Processing message from $from (session=$sessionId): $userInput")
 
         try {
-            agent.run(userInput, sessionId)
+            val reply = withTimeout(30_000) { agent.run(userInput, sessionId) }
+            if (!tools.didSendReply() && reply.isNotBlank()) {
+                kapsoClient.sendText(from, reply.trim())
+            }
+        } catch (e: TimeoutCancellationException) {
+            logger.error("Agent timed out processing message from $from", e)
+            kapsoClient.sendText(
+                    from,
+                    "Sorry, I'm taking longer than expected. Please try again in a moment."
+            )
         } catch (e: Exception) {
             logger.error("Agent error processing message from $from", e)
             // Inform the user rather than silently dropping the message.
@@ -81,65 +95,92 @@ class BotAgent(
                     temperature = 0.7,
                     maxIterations = 10,
                     toolRegistry = ToolRegistry { tools(toolSet) },
-            ) { install(ChatMemory) { windowSize(20) } }
+            ) {
+                install(ChatMemory) {
+                    chatHistoryProvider = this@BotAgent.sharedChatHistoryProvider
+                    windowSize(20)
+                }
+            }
 
-    private fun buildUserInput(message: InboundMessage): String = buildString {
-        val mediaData = message.kapso?.mediaData
+    private fun buildUserInput(message: InboundMessage): String =
+            formatInboundMessageForLlm(message)
+}
 
-        when (message.type) {
-            "text" -> append(message.text?.body ?: message.kapso?.content ?: "(empty text)")
-            "image" -> {
-                append("[User sent an image")
-                message.image?.caption?.takeIf { it.isNotBlank() }?.let {
-                    append(" with caption: $it")
-                }
-                mediaData?.let { md ->
-                    append(". Media URL: ${md.url}")
-                    md.filename?.let { append(", filename: $it") }
-                    md.contentType?.let { append(", type: $it") }
-                }
-                append("]")
+internal fun formatInboundMessageForLlm(message: InboundMessage): String = buildString {
+    val mediaData = message.kapso?.mediaData
+
+    when (message.type) {
+        "text" -> append(message.text?.body ?: message.kapso?.content ?: "(empty text)")
+        "image" -> {
+            append("[User sent an image")
+            message.image?.caption?.takeIf { it.isNotBlank() }?.let { append(" with caption: $it") }
+            mediaData?.let { md ->
+                append(". Media URL: ${md.url}")
+                md.filename?.let { append(", filename: $it") }
+                md.contentType?.let { append(", type: $it") }
             }
-            "video" -> {
-                append("[User sent a video")
-                message.video?.caption?.takeIf { it.isNotBlank() }?.let {
-                    append(" with caption: $it")
-                }
-                mediaData?.url?.let { append(". Media URL: $it") }
-                append("]")
-            }
-            "audio" -> {
-                append("[User sent a voice message / audio clip")
-                mediaData?.url?.let { append(". Media URL: $it") }
-                message.kapso?.transcript?.text?.let { append(". Transcript: $it") }
-                append("]")
-            }
-            "document" -> {
-                append("[User sent a document")
-                val name = message.document?.filename ?: mediaData?.filename
-                name?.let { append(": $it") }
-                message.document?.caption?.takeIf { it.isNotBlank() }?.let {
-                    append(" (caption: $it)")
-                }
-                mediaData?.url?.let { append(". Media URL: $it") }
-                append("]")
-            }
-            "location" -> {
-                val loc = message.location
-                append("[User shared a location: lat=${loc?.latitude}, lon=${loc?.longitude}")
-                loc?.name?.let { append(", name: $it") }
-                loc?.address?.let { append(", address: $it") }
-                append("]")
-            }
-            "reaction" ->
-                    append(
-                            "[User reacted with '${message.reaction?.emoji}' to message ${message.reaction?.messageId}]"
-                    )
-            "sticker" -> append("[User sent a sticker]")
-            "contacts" -> append("[User shared a contact card]")
-            else -> append("[User sent a ${message.type ?: "unknown"} message]")
+            append("]")
         }
-
-        message.context?.id?.let { append("\n(This is a reply to message $it)") }
+        "video" -> {
+            append("[User sent a video")
+            message.video?.caption?.takeIf { it.isNotBlank() }?.let { append(" with caption: $it") }
+            mediaData?.url?.let { append(". Media URL: $it") }
+            append("]")
+        }
+        "audio" -> {
+            append("[User sent a voice message / audio clip")
+            mediaData?.url?.let { append(". Media URL: $it") }
+            message.kapso?.transcript?.text?.let { append(". Transcript: $it") }
+            append("]")
+        }
+        "document" -> {
+            append("[User sent a document")
+            val name = message.document?.filename ?: mediaData?.filename
+            name?.let { append(": $it") }
+            message.document?.caption?.takeIf { it.isNotBlank() }?.let { append(" (caption: $it)") }
+            mediaData?.url?.let { append(". Media URL: $it") }
+            append("]")
+        }
+        "location" -> {
+            val loc = message.location
+            append("[User shared a location: lat=${loc?.latitude}, lon=${loc?.longitude}")
+            loc?.name?.let { append(", name: $it") }
+            loc?.address?.let { append(", address: $it") }
+            append("]")
+        }
+        "reaction" ->
+                append(
+                        "[User reacted with '${message.reaction?.emoji}' to message ${message.reaction?.messageId}]"
+                )
+        "interactive" -> append(formatInteractiveMessage(message.interactive))
+        "sticker" -> append("[User sent a sticker]")
+        "contacts" -> append("[User shared a contact card]")
+        else -> append("[User sent a ${message.type ?: "unknown"} message]")
     }
+
+    message.context?.id?.let { append("\n(This is a reply to message $it)") }
+}
+
+private fun formatInteractiveMessage(interactive: InboundInteractive?): String {
+    if (interactive == null) {
+        return "[User sent an interactive message]"
+    }
+
+    interactive.buttonReply?.let { reply ->
+        val title = reply.title ?: "unknown"
+        val id = reply.id ?: "unknown"
+        return "[User selected button \"$title\" (id: $id)]"
+    }
+
+    interactive.listReply?.let { reply ->
+        val title = reply.title ?: "unknown"
+        val id = reply.id ?: "unknown"
+        return buildString {
+            append("[User selected list option \"$title\" (id: $id)")
+            reply.description?.takeIf { it.isNotBlank() }?.let { append(", description: $it") }
+            append("]")
+        }
+    }
+
+    return "[User sent an interactive message]"
 }
