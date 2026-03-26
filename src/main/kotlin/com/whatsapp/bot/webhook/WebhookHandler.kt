@@ -1,6 +1,7 @@
 package com.whatsapp.bot.webhook
 
 import com.whatsapp.bot.agent.BotAgent
+import com.whatsapp.bot.kapso.BatchedWebhookPayload
 import com.whatsapp.bot.kapso.WebhookEvent
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,6 +15,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("WebhookHandler")
@@ -78,9 +81,9 @@ fun Route.webhookRoutes(agent: BotAgent, webhookSecret: String) {
         }
 
         // ── Parse & dispatch on the application's lifecycle scope ─────────────
-        val event =
+        val events =
                 try {
-                    json.decodeFromString<WebhookEvent>(rawBytes.decodeToString())
+                    decodeWebhookEvents(rawBytes.decodeToString())
                 } catch (e: Exception) {
                     // Return 400 so Kapso can retry; a 200 would mark delivery as successful.
                     logger.error("Failed to parse webhook payload: ${e.message}")
@@ -88,13 +91,27 @@ fun Route.webhookRoutes(agent: BotAgent, webhookSecret: String) {
                     return@post
                 }
 
-        call.application.launch { handleEvent(event, agent) }
+        events.forEach { event -> call.application.launch { handleEvent(event, agent) } }
 
         call.respond(HttpStatusCode.OK, "OK")
     }
 
     // Health-check so Kapso can verify the endpoint is reachable
     get("/webhook") { call.respond(HttpStatusCode.OK, "WhatsApp bot webhook is running") }
+}
+
+internal fun decodeWebhookEvents(rawPayload: String): List<WebhookEvent> {
+    return when (val element = json.parseToJsonElement(rawPayload)) {
+        is JsonArray -> element.map { json.decodeFromJsonElement<WebhookEvent>(it) }
+        is JsonObject ->
+                if ("data" in element) {
+                    val payload = json.decodeFromJsonElement<BatchedWebhookPayload>(element)
+                    payload.data
+                } else {
+                    listOf(json.decodeFromJsonElement<WebhookEvent>(element))
+                }
+        else -> error("Unsupported webhook payload shape")
+    }
 }
 
 private suspend fun handleEvent(event: WebhookEvent, agent: BotAgent) {

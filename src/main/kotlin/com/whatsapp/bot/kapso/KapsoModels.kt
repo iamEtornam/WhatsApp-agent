@@ -117,6 +117,13 @@ data class WebhookEvent(
 )
 
 @Serializable
+data class BatchedWebhookPayload(
+        val type: String? = null,
+        val batch: Boolean? = null,
+        val data: List<WebhookEvent> = emptyList(),
+)
+
+@Serializable
 data class MessageKapso(
         val direction: String? = null,
         val status: String? = null,
