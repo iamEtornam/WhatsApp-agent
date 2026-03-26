@@ -84,14 +84,16 @@ class BotAgent(
             ) { install(ChatMemory) { windowSize(20) } }
 
     private fun buildUserInput(message: InboundMessage): String = buildString {
+        val mediaData = message.kapso?.mediaData
+
         when (message.type) {
-            "text" -> append(message.text?.body ?: "(empty text)")
+            "text" -> append(message.text?.body ?: message.kapso?.content ?: "(empty text)")
             "image" -> {
                 append("[User sent an image")
                 message.image?.caption?.takeIf { it.isNotBlank() }?.let {
                     append(" with caption: $it")
                 }
-                message.mediaData?.let { md ->
+                mediaData?.let { md ->
                     append(". Media URL: ${md.url}")
                     md.filename?.let { append(", filename: $it") }
                     md.contentType?.let { append(", type: $it") }
@@ -103,22 +105,23 @@ class BotAgent(
                 message.video?.caption?.takeIf { it.isNotBlank() }?.let {
                     append(" with caption: $it")
                 }
-                message.mediaData?.url?.let { append(". Media URL: $it") }
+                mediaData?.url?.let { append(". Media URL: $it") }
                 append("]")
             }
             "audio" -> {
                 append("[User sent a voice message / audio clip")
-                message.mediaData?.url?.let { append(". Media URL: $it") }
+                mediaData?.url?.let { append(". Media URL: $it") }
+                message.kapso?.transcript?.text?.let { append(". Transcript: $it") }
                 append("]")
             }
             "document" -> {
                 append("[User sent a document")
-                val name = message.document?.filename ?: message.mediaData?.filename
+                val name = message.document?.filename ?: mediaData?.filename
                 name?.let { append(": $it") }
                 message.document?.caption?.takeIf { it.isNotBlank() }?.let {
                     append(" (caption: $it)")
                 }
-                message.mediaData?.url?.let { append(". Media URL: $it") }
+                mediaData?.url?.let { append(". Media URL: $it") }
                 append("]")
             }
             "location" -> {

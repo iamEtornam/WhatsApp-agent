@@ -7,14 +7,14 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import java.util.concurrent.ConcurrentHashMap
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import java.util.concurrent.ConcurrentHashMap
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 private val logger = LoggerFactory.getLogger("WebhookHandler")
 
@@ -24,10 +24,9 @@ private val json = Json {
 }
 
 /**
- * In-memory deduplication cache: idempotency key → arrival epoch-ms.
- * A background coroutine (launched once per application lifecycle) sweeps
- * expired entries every [DEDUP_TTL_MS], so memory is bounded regardless of
- * traffic patterns.
+ * In-memory deduplication cache: idempotency key → arrival epoch-ms. A background coroutine
+ * (launched once per application lifecycle) sweeps expired entries every [DEDUP_TTL_MS], so memory
+ * is bounded regardless of traffic patterns.
  */
 private val seenKeys = ConcurrentHashMap<String, Long>()
 private const val DEDUP_TTL_MS = 5 * 60 * 1_000L // 5 minutes
@@ -36,10 +35,10 @@ private const val DEDUP_TTL_MS = 5 * 60 * 1_000L // 5 minutes
  * Registers the `/webhook` POST route that Kapso will call for every WhatsApp event.
  *
  * - Signature verification is performed when [webhookSecret] is non-empty.
- * - Duplicate deliveries are suppressed via an idempotency-key cache with
- *   scheduled eviction tied to the application lifecycle.
- * - Message processing is dispatched on the application's lifecycle scope so
- *   coroutines are cancelled cleanly on shutdown.
+ * - Duplicate deliveries are suppressed via an idempotency-key cache with scheduled eviction tied
+ * to the application lifecycle.
+ * - Message processing is dispatched on the application's lifecycle scope so coroutines are
+ * cancelled cleanly on shutdown.
  * - Parse failures return 400 so Kapso can retry.
  * - HMAC verification operates on raw bytes to avoid encoding round-trip bugs.
  */
@@ -79,83 +78,66 @@ fun Route.webhookRoutes(agent: BotAgent, webhookSecret: String) {
         }
 
         // ── Parse & dispatch on the application's lifecycle scope ─────────────
-        val event = try {
-            json.decodeFromString<WebhookEvent>(rawBytes.decodeToString())
-        } catch (e: Exception) {
-            // Return 400 so Kapso can retry; a 200 would mark delivery as successful.
-            logger.error("Failed to parse webhook payload: ${e.message}")
-            call.respond(HttpStatusCode.BadRequest, "Invalid payload")
-            return@post
-        }
+        val event =
+                try {
+                    json.decodeFromString<WebhookEvent>(rawBytes.decodeToString())
+                } catch (e: Exception) {
+                    // Return 400 so Kapso can retry; a 200 would mark delivery as successful.
+                    logger.error("Failed to parse webhook payload: ${e.message}")
+                    call.respond(HttpStatusCode.BadRequest, "Invalid payload")
+                    return@post
+                }
 
-        call.application.launch {
-            handleEvent(event, agent)
-        }
+        call.application.launch { handleEvent(event, agent) }
 
         call.respond(HttpStatusCode.OK, "OK")
     }
 
     // Health-check so Kapso can verify the endpoint is reachable
-    get("/webhook") {
-        call.respond(HttpStatusCode.OK, "WhatsApp bot webhook is running")
-    }
+    get("/webhook") { call.respond(HttpStatusCode.OK, "WhatsApp bot webhook is running") }
 }
 
 private suspend fun handleEvent(event: WebhookEvent, agent: BotAgent) {
-    val eventType = event.event ?: return
+    val message = event.message
+    val direction = message?.kapso?.direction
+    val status = message?.kapso?.status
 
-    logger.info("Handling event: $eventType")
+    logger.info(
+            "Webhook: direction=$direction, status=$status, type=${message?.type}, id=${message?.id}"
+    )
 
-    when (eventType) {
-        "whatsapp.message.received" -> {
-            val message = event.message ?: return
-            val sender = message.from
-                ?: event.conversation?.contact?.phoneNumber
-                ?: run {
-                    logger.warn("Cannot determine sender for received message")
-                    return
-                }
+    if (message == null) {
+        logger.debug("Non-message webhook (conversation event): convId=${event.conversation?.id}")
+        return
+    }
+
+    when (direction) {
+        "inbound" -> {
+            val sender =
+                    event.conversation?.phoneNumber
+                            ?: message.from
+                                    ?: run {
+                                logger.warn("Cannot determine sender for inbound message")
+                                return
+                            }
 
             logger.info("Processing inbound message (type=${message.type}) from $sender")
             agent.process(message, sessionId = sender)
         }
-
-        "whatsapp.message.sent" ->
-            logger.info("Message sent: ${event.message?.id}")
-
-        "whatsapp.message.delivered" ->
-            logger.info("Message delivered: ${event.message?.id}")
-
-        "whatsapp.message.read" ->
-            logger.info("Message read: ${event.message?.id}")
-
-        "whatsapp.message.failed" ->
-            logger.warn("Message failed: ${event.message?.id}")
-
-        "whatsapp.conversation.created" ->
-            logger.info("Conversation created: ${event.conversation?.id}")
-
-        "whatsapp.conversation.ended" ->
-            logger.info("Conversation ended: ${event.conversation?.id}")
-
-        "whatsapp.conversation.inactive" ->
-            logger.info("Conversation inactive: ${event.conversation?.id}")
-
-        "whatsapp.phone_number.created" ->
-            logger.info("New phone number connected: ${event.conversation?.phoneNumber?.number}")
-
-        "whatsapp.phone_number.deleted" ->
-            logger.info("Phone number removed: ${event.conversation?.phoneNumber?.number}")
-
-        else -> logger.debug("Unhandled event type: $eventType")
+        "outbound" -> logger.info("Outbound message $status: ${message.id}")
+        else -> logger.debug("Unknown message direction: $direction")
     }
 }
 
 /**
- * Verify the HMAC-SHA256 signature sent by Kapso in `X-Webhook-Signature`.
- * Operates on the raw request bytes to avoid any charset encoding ambiguity.
+ * Verify the HMAC-SHA256 signature sent by Kapso in `X-Webhook-Signature`. Operates on the raw
+ * request bytes to avoid any charset encoding ambiguity.
  */
-private fun verifySignature(payload: ByteArray, secret: String, receivedSignature: String): Boolean {
+private fun verifySignature(
+        payload: ByteArray,
+        secret: String,
+        receivedSignature: String
+): Boolean {
     return try {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(secret.toByteArray(Charsets.UTF_8), "HmacSHA256"))
