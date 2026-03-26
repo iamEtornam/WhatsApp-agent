@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("WebhookHandler")
