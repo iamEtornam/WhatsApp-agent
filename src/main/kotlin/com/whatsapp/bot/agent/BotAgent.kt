@@ -99,6 +99,7 @@ class BotAgent(
                 install(ChatMemory) {
                     chatHistoryProvider = this@BotAgent.sharedChatHistoryProvider
                     windowSize(20)
+                    addPreProcessor(GeminiTurnOrderPreProcessor())
                 }
             }
 
